@@ -1,0 +1,151 @@
+Roteiro para uso do fargate
+--
+
+>> Fonte: https://www.youtube.com/watch?v=SwUC4sXEcqE&list=PLWQmZVQayUUI5RinDqpoIXiRYWy5YZKjs&index=1
+
+Criação da VPC: criar o ambiente para criação de subnets e associação de outros recursos como internet gateway e load balancer
+
+Subnets: por padrão são privadas, temos que configurar com tabelas de roteamento
+
+Tabelas de roteamento: informar quais são as redes associadas explicitamente para que os canais estejam configurados
+
+
+Load balancer:
+	- setar subredes públicas
+	- informar security group
+		- criar inbound rules (portas e origem do tráfego)
+	- Informar listener (http):
+		- criar target group
+			- tipo: ip address
+			- health check: status 204
+
+Criar cluster:
+	- Criar task definition com:
+		- SO
+		- Porta
+		- Container
+			- imagem
+	- Criar serviço
+		- duas instâncias (cria automaticamente duas tarefas)
+
+--
+
+Excluir tudo:
+
+ECS
+	- parar tasks
+	- excluir serviço
+	- Task definitions -> cancelar registro
+
+Load balancer
+
+Target group
+
+Service security group
+
+Load balancer security group
+
+NAT Gateways
+
+Subnets
+
+Dettach Internet Gateway
+
+Delete Internet Gateway
+
+Route tables
+
+VPC
+
+ECS Cluster
+
+--
+
+Criar repos no ECR
+	- push da imagem
+Criar VPC
+	- criar pares de subnets:
+		- 1 pública e uma privada em cada zona de disponibilidade (AZ)
+Criar novo internet gateway
+	- associar à vpc criada
+Criar tabelas de rotas:
+	- criar tabelas de rotas
+		- 2 tabelas para as subredes privadas (associações explícitas)
+		- 1 tabela para as subredes públicas (associações explícitas)
+	- criar rota dentro da tabela de subredes públicas
+		- adicionar rota para 0.0.0.0 vindo do internet gateway
+
+Criar load balancer (internet facing)
+	- associar VPC
+		- mapear subredes nas duas AZs
+			- selecionar para cada AZ a subrede pública
+	- criar security group novo
+		- informar a VPC
+		- informar regras de entrada
+			- vindo de http
+			- de qualquer lugar da internet
+			- ipv4
+	- selecionar security group recem criado
+	- criar listener
+		- ouvindo na porta 80
+		- direcionar para target group
+			- criar target group
+				- basear em IP (será gerenciado pelo fargate)
+				- selecionar http na porta 80
+				- ipv4
+				- http1
+				- informar endpoint de healthcheck
+				- trocar o status code do retorno do healthcheck
+
+Cluster ECS
+	- criar cluster
+		- somente redes (para poder usar o fargate)
+			- habilitar container insights (cloudwatch)
+	- criar task definition (informações que os containers receberão)
+		- fargate
+		- nenhum perfil
+		- linux
+		- memória e CPU no mínimo
+		- adicionar container
+			- informar a imagem que o container usará
+			- limite de memória flexível
+			- mapear portas
+				- 8080 para o nginx do ambientum
+	- criar serviço
+		- fargate
+		- selecionar a task criada anteriormente
+		- duas tarefas (containers)
+		- ir para o próximo passo
+		- selecionar vpc
+		- selecionar subnets privadas
+		- selecionar load balancer criado anteriormente
+		- selecionar o tempo para "Período de carência da verificação de integridade" (30 segundos)
+		- adicionar porta no load balancer
+			- selecionar porta 80 para o listener
+			- selecionar o target group criado anteriormente (ele tratá a porta configurada lá)
+		- ir para a próxima etapa
+			- deixar como está
+		- próxima etapa
+
+NAT Gateway
+	- criar primeiro nat gateway
+		- setar a primeira subrede privada
+		- alocar ip elástico
+	- modificar subredes privadas para receber do load balancer/nat gateway
+		- criar rota para primeira subnet privada (pvt-a)
+			- adicionar rota vindo da subrede pub-a vindo do nat gateway
+
+Atualizar o serviço criado dentro do cluster
+	- Verificar os logs de inicialização de cada tarefa
+	- Alterar security group
+		- retirar a regra padrão
+		- adicionar uma nova
+			- All tcp
+			- source:
+				tipo: custom
+				buscar: selecionar security group do load balancer (*-srcgrp, descrição "aceita acesso da internet")
+
+Testar o acesso à aplicação:
+	- Selecionar o load balancer
+	- copiar o endereço do load balancer
+	- colar no browser e tentar acesso

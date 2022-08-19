@@ -1,0 +1,11 @@
+FROM nginx
+
+ARG MY_API_ADDR
+ENV API_ADDR=${MY_API_ADDR}
+RUN echo $API_ADDR
+
+COPY public/index.html /usr/share/nginx/html
+
+RUN sed -i \
+        -r "s#http://172.21.0.2:8080#$API_ADDR#" \
+        /usr/share/nginx/html/index.html

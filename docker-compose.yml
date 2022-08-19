@@ -1,0 +1,52 @@
+version: "3.6"
+services:
+
+  api:
+    #image: ambientum/php:8.1-nginx
+    image: evaldobarbosa/simple-api
+    build:
+      context: .
+      dockerfile: ./simple-api/Dockerfile
+      args:
+        - DB_HOST=172.25.0.2
+        - DB_USERNAME=banks
+        - DB_PASSWORD=bankspass
+        - DB_DATABASE=rdccorp
+    container_name: simple-api-host
+    # volumes:
+      # - ./simple-api:/var/www/app
+    restart: unless-stopped
+    networks:
+      - default
+      - db_redeciclo_corp
+
+  front:
+    #image: ambientum/php:8.1-nginx
+    image: evaldobarbosa/simple-front
+    build:
+      context: .
+      dockerfile: Dockerfile.front
+      args:
+      - MY_API_ADDR:http://172.21.0.2:8080/api
+      # - MY_API_ADDR=http://nova-app-alb-a-1638699513.us-east-1.elb.amazonaws.com:8080/api
+    container_name: simple-front-host
+    # volumes:
+    #  - .:/var/www/app
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  docs:
+    image: ambientum/php:8.1-nginx
+    container_name: simple-docs-host
+    volumes:
+      - ./public/aws.html:/var/www/app/public/index.html
+    restart: unless-stopped
+    depends_on:
+      - front
+
+networks:
+  default:
+    driver: bridge
+  db_redeciclo_corp:
+    external: true
